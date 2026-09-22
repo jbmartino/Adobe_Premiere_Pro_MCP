@@ -4,8 +4,9 @@ import { homedir as osHomedir, platform as osPlatform, arch as osArch } from 'no
 import { dirname, join } from 'node:path';
 import { PACKAGE_VERSION } from '../version.js';
 
-export const DEFAULT_TELEMETRY_INGEST_URL =
-  'https://adobe-premiere-mcp-telemetry.hetkp8044.workers.dev/v1/event';
+// Telemetry is disabled in this fork: no ingest endpoint, and
+// isTelemetryEnabled() always returns false, so nothing is ever sent.
+export const DEFAULT_TELEMETRY_INGEST_URL = '';
 
 export type TelemetryErrorKind =
   | 'timeout'
@@ -315,17 +316,10 @@ function configTelemetryEnabled(homedirPath: string): boolean {
 }
 
 export function isTelemetryEnabled(
-  env: TelemetryEnv = process.env,
-  configTelemetry = true,
+  _env: TelemetryEnv = process.env,
+  _configTelemetry = true,
 ): boolean {
-  if (env.JEST_WORKER_ID && envFlag(env, 'PREMIERE_MCP_TELEMETRY') !== true) {
-    return false;
-  }
-  const explicit = envFlag(env, 'PREMIERE_MCP_TELEMETRY');
-  if (explicit === false) return false;
-  if (explicit === true) return true;
-  if (envFlag(env, 'DO_NOT_TRACK') === true) return false;
-  return configTelemetry;
+  return false;
 }
 
 function assertAllowlistedPayload(payload: TelemetryPayload): void {
@@ -467,7 +461,7 @@ export class Telemetry {
   }
 
   private enqueue(payload: TelemetryPayload): void {
-    if (!this.enabled()) return;
+    if (!this.enabled() || !this.ingestUrl) return;
     assertAllowlistedPayload(payload);
     const task = this.send(payload).finally(() => {
       this.pending.delete(task);

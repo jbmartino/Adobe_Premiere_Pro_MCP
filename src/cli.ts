@@ -17,7 +17,7 @@ Usage:
   premiere-pro-mcp --version       Print the installed package version
   premiere-pro-mcp --help          Show this help
 
-Telemetry is on by default. Set PREMIERE_MCP_TELEMETRY=0 to opt out.
+Telemetry is disabled in this fork. Nothing is sent.
 Update checks are on by default. Set PREMIERE_MCP_UPDATE_CHECK=0 to opt out.
 Tool search is on by default (search_tools + invoke_tool). Set PREMIERE_MCP_TOOLSET=full to advertise every Premiere tool to the MCP host.
 `);

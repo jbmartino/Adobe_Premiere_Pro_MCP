@@ -433,7 +433,7 @@
         this.isProcessing = false;
         this.evalScriptBusy = false;
         this.evalScriptQueue = [];
-        this.telemetryEnabled = true;
+        this.telemetryEnabled = false;
         this.csInterface = new CSInterface();
         this.init();
     }
@@ -807,7 +807,7 @@
             }
 
             var telemetryEl = document.getElementById('telemetryEnabled');
-            if (telemetryEl) telemetryEl.checked = this.telemetryEnabled !== false;
+            if (telemetryEl) telemetryEl.checked = false;
         } catch (e) {}
     };
 
@@ -834,8 +834,9 @@
 
     MCPPremiereBridge.prototype.readTelemetryEnabled = function() {
         var telemetryEl = document.getElementById('telemetryEnabled');
-        if (telemetryEl) this.telemetryEnabled = !!telemetryEl.checked;
-        return this.telemetryEnabled !== false;
+        if (telemetryEl) telemetryEl.checked = false;
+        this.telemetryEnabled = false;
+        return false;
     };
 
     MCPPremiereBridge.prototype.saveTelemetryPreference = function() {

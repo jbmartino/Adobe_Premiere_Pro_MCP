@@ -44,33 +44,9 @@ function writeConfig(home: string, telemetry: boolean | undefined): void {
 }
 
 describe('isTelemetryEnabled', () => {
-  it('is on by default', () => {
-    expect(isTelemetryEnabled({}, true)).toBe(true);
-  });
-
-  it('turns off for PREMIERE_MCP_TELEMETRY=0', () => {
-    expect(isTelemetryEnabled({ PREMIERE_MCP_TELEMETRY: '0' }, true)).toBe(false);
-  });
-
-  it('turns off for DO_NOT_TRACK=1', () => {
-    expect(isTelemetryEnabled({ DO_NOT_TRACK: '1' }, true)).toBe(false);
-  });
-
-  it('turns off when config.json sets telemetry false', () => {
-    expect(isTelemetryEnabled({}, false)).toBe(false);
-  });
-
-  it('lets PREMIERE_MCP_TELEMETRY=1 override DO_NOT_TRACK and config', () => {
-    expect(
-      isTelemetryEnabled({ PREMIERE_MCP_TELEMETRY: '1', DO_NOT_TRACK: '1' }, false),
-    ).toBe(true);
-  });
-
-  it('stays off inside Jest unless explicitly enabled', () => {
-    expect(isTelemetryEnabled({ JEST_WORKER_ID: '1' }, true)).toBe(false);
-    expect(
-      isTelemetryEnabled({ JEST_WORKER_ID: '1', PREMIERE_MCP_TELEMETRY: '1' }, true),
-    ).toBe(true);
+  it('is always off in this fork, even when explicitly enabled', () => {
+    expect(isTelemetryEnabled({})).toBe(false);
+    expect(isTelemetryEnabled({ PREMIERE_MCP_TELEMETRY: '1' }, true)).toBe(false);
   });
 });
 
@@ -207,129 +183,17 @@ describe('Telemetry', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('sends only allowlisted fields and never includes args, paths, or unsanitized error text', async () => {
-    const telemetry = makeTelemetry();
+  it('never sends or writes an install id, even when explicitly enabled', async () => {
+    writeConfig(home, true);
+    const telemetry = makeTelemetry({ PREMIERE_MCP_TELEMETRY: '1' });
     telemetry.trackServerStarted();
-    telemetry.trackToolCall({
-      tool: 'import_media',
-      success: false,
-      durationMs: 41,
-      errorKind: 'timeout',
-      errorCode: 'bridge.timeout',
-      errorFields: 'mediaPath',
-      errorDetail:
-        'Bridge response timeout. Temp Directory is set to /Users/het/secret, and Start Bridge is clicked.',
-      retry: false,
-      status: 'bridge_unavailable',
-    });
-    await telemetry.flush();
-
-    expect(captured).toHaveLength(2);
-    for (const payload of captured) {
-      for (const key of Object.keys(payload)) {
-        expect(ALLOWED_PAYLOAD_KEYS.has(key)).toBe(true);
-      }
-      expect(payload).not.toHaveProperty('args');
-      expect(payload).not.toHaveProperty('error');
-      expect(payload).not.toHaveProperty('path');
-      expect(JSON.stringify(payload)).not.toContain('/Users');
-      expect(JSON.stringify(payload)).not.toContain('.prproj');
-      expect(JSON.stringify(payload)).not.toContain('secret');
-    }
-
-    expect(captured[0]).toMatchObject({
-      event: 'server_started',
-      version: '1.2.2',
-      os: 'darwin',
-      arch: 'arm64',
-      node: 'v20.11.0',
-    });
-    expect(captured[0]).not.toHaveProperty('tool');
-    expect(captured[1]).toMatchObject({
-      event: 'tool_called',
-      tool: 'import_media',
-      success: false,
-      duration_ms: 41,
-      error_kind: 'timeout',
-      error_code: 'bridge.timeout',
-      error_fields: 'mediaPath',
-      error_detail:
-        'Bridge response timeout. Temp Directory is set to <path>, and Start Bridge is clicked.',
-      retry: false,
-      status: 'bridge_unavailable',
-    });
-  });
-
-  it('sends a successful tool call once per tool per process', async () => {
-    const telemetry = makeTelemetry();
+    telemetry.trackToolCall({ tool: 'import_media', success: false, durationMs: 41 });
     telemetry.trackToolCall({ tool: 'ping', success: true, durationMs: 4 });
-    telemetry.trackToolCall({ tool: 'ping', success: true, durationMs: 5 });
-    telemetry.trackToolCall({ tool: 'list_sequences', success: true, durationMs: 8 });
     await telemetry.flush();
-    expect(captured).toHaveLength(2);
-    expect(captured[0]).toMatchObject({ event: 'tool_called', tool: 'ping', success: true });
-    expect(captured[1]).toMatchObject({
-      event: 'tool_called',
-      tool: 'list_sequences',
-      success: true,
-    });
-  });
 
-  it('replaces illegal tool names instead of sending caller-supplied strings', async () => {
-    const telemetry = makeTelemetry();
-    telemetry.trackToolCall({
-      tool: '../etc/passwd',
-      success: false,
-      durationMs: 1,
-    });
-    await telemetry.flush();
-    expect(captured[0]?.tool).toBe('invalid_tool_name');
-  });
-
-  it('reuses the install id written to ~/.premiere-mcp-bridge/install-id', async () => {
-    const first = makeTelemetry();
-    first.trackServerStarted();
-    await first.flush();
-
-    const second = new Telemetry({
-      env: {},
-      homedir: () => home,
-      fetch: fetchMock,
-      randomUUID: () => 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-      platform: 'darwin',
-      arch: 'arm64',
-      nodeVersion: 'v20.11.0',
-      packageVersion: '1.2.2',
-      ingestUrl: 'https://example.test/v1/event',
-    });
-    second.trackServerStarted();
-    await second.flush();
-
-    expect(captured[0]?.distinct_id).toBe('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
-    expect(captured[1]?.distinct_id).toBe('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
-    expect(readFileSync(join(home, '.premiere-mcp-bridge', 'install-id'), 'utf8').trim()).toBe(
-      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-    );
-  });
-
-  it('swallows network failures so a telemetry outage cannot fail a tool call', async () => {
-    const failingFetch: typeof fetch = jest.fn(async () => {
-      throw new Error('network down');
-    });
-    const telemetry = new Telemetry({
-      env: {},
-      homedir: () => home,
-      fetch: failingFetch,
-      randomUUID: () => 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-      platform: 'darwin',
-      arch: 'arm64',
-      nodeVersion: 'v20.11.0',
-      packageVersion: '1.2.2',
-      ingestUrl: 'https://example.test/v1/event',
-    });
-
-    telemetry.trackToolCall({ tool: 'ping', success: false, durationMs: 2 });
-    await expect(telemetry.flush()).resolves.toBeUndefined();
-    expect(failingFetch).toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(() =>
+      readFileSync(join(home, '.premiere-mcp-bridge', 'install-id'), 'utf8'),
+    ).toThrow();
   });
 });

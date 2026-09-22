@@ -598,10 +598,10 @@
             <label for="tempDirectory">Temp Directory</label>
             <input type="text" id="tempDirectory" placeholder="Temp Directory (e.g. /tmp/premiere-mcp-bridge)">
             <label class="toggle-row" for="telemetryEnabled">
-                <input type="checkbox" id="telemetryEnabled" checked onchange="saveTelemetryPreference()">
+                <input type="checkbox" id="telemetryEnabled" disabled>
                 <span class="toggle-copy">
                     <span class="toggle-title">Share anonymous usage data</span>
-                    <span class="toggle-help">On by default. Sends tool names, success or failure, duration, OS, and version. Never sends project names, media paths, or arguments. Uncheck to opt out.</span>
+                    <span class="toggle-help">Disabled in this fork. Nothing is sent.</span>
                 </span>
             </label>
             <div class="button-row">
